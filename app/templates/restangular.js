@@ -8,7 +8,7 @@ module.exports = {
   }],
   "bower": {
     "dependencies": {
-      "restangular": "{{= prompts.version}}"
+      "restangular": "{{= instance.prompts.version}}"
     }
   },
   "grunt": {

@@ -1,19 +1,21 @@
 'use strict';
 var _ = require('lodash');
 
-exports.toInt = function () {
+exports.inquirer = {};
+
+exports.inquirer.toInt = function () {
   return function (input) {
     return _.parseInt(input);
   }
 }
 
-exports.toBoolean = function () {
+exports.inquirer.toBoolean = function () {
   return function (input) {
     return !!input;
   }
 }
 
-exports.toUndefined = function () {
+exports.inquirer.toUndefined = function () {
   return function (input) {
     if (input === '') {
       return undefined;
@@ -23,9 +25,9 @@ exports.toUndefined = function () {
   }
 }
 
-exports.required = function (msg) {
+exports.inquirer.required = function (msg) {
   return function (input) {
-    if (exports.toUndefined()(input) === undefined) {
+    if (exports.inquirer.toUndefined()(input) === undefined) {
       return msg || 'You must enter a value.'
     } else {
       return true;
@@ -33,7 +35,7 @@ exports.required = function (msg) {
   }
 }
 
-exports.regex = function (regex) {
+exports.inquirer.regex = function (regex) {
   return function (input) {
     if (regex.test(input)) {
       return true;

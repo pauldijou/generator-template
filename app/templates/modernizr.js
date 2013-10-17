@@ -8,7 +8,7 @@ module.exports = {
   }],
   "bower": {
     "dependencies": {
-      "modernizr": "{{= prompts.version}}"
+      "modernizr": "{{= instance.prompts.version}}"
     }
   },
   "grunt": {

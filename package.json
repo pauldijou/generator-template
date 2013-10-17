@@ -29,7 +29,8 @@
     "lodash": "~2.2.0",
     "underscore.string": "~2.3.0",
     "q": "0.9.7",
-    "request": "~2.27.0"
+    "request": "~2.27.0",
+    "minimatch": "0.2.12"
   },
   "devDependencies": {
     "mocha": "~1.9.0"

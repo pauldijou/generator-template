@@ -8,7 +8,7 @@ module.exports = {
   }],
   "bower": {
     "dependencies": {
-      "font-awesome": "{{= prompts.version}}"
+      "font-awesome": "{{= instance.prompts.version}}"
     }
   },
   "grunt": {

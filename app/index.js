@@ -53,14 +53,14 @@ TemplateGenerator.prototype.loadInstance = function (opts) {
 
   // Asynchrounsly check which paths exist
   this._log('info', 'Looking for your template at the following paths:');
-  this.instance.paths = this._.map(this.instance.rootPaths, this._checkPath, this);
+  this.instance.paths = this._.map(this.instance.rootPaths, this.checkPath, this);
   
   var cb = this.async();
   var self = this;
 
-  var filterPaths = this._.bind(this._filterPaths, this);
-  var chooseInstancePath = this._.bind(this._chooseInstancePath, this);
-  var downloadIfRemote = this._.bind(this._downloadIfRemote, this);
+  var filterPaths = this._.bind(this.filterPaths, this);
+  var chooseInstancePath = this._.bind(this.chooseInstancePath, this);
+  var downloadIfRemote = this._.bind(this.downloadIfRemote, this);
 
   // When all checks completed...
   q.allSettled(this.instance.paths)
@@ -76,7 +76,10 @@ TemplateGenerator.prototype.loadInstance = function (opts) {
 
       try {
         self.instance.stats = fs.statSync( self.instance.path.localPath );
+
+        // Load the instance of the template which should be a valid Node module
         self.instance.content = require( self.instance.path.localPath );
+
         if (!self.instance.content) {
           return self.emit('error', 'No module file found for name "' + self.instance.name + '" at path "' + self.instance.path.localPath + '"');
         }
@@ -99,7 +102,7 @@ TemplateGenerator.prototype.loadInstance = function (opts) {
 TemplateGenerator.prototype.welcome = function (opts) {
   if (this.instance.content && this.instance.content.welcome) {
     this._.forEach(this.instance.content.welcome, function (w) {
-      this.this._log(w.status, w.message);
+      this._log(w.status, w.message);
     }, this)
   }
 };
@@ -126,9 +129,10 @@ TemplateGenerator.prototype.doPrompts = function (opts) {
       }
 
       this.instance.prompts = props;
-      this.instance.content = this.recursiveEngines()[this.instance.content.engine || 'default'].call(this, this.instance.content, this.instance);
-      
-      this.log.write();
+
+      // Template the content of the instance using the engine of your choice (default, underscore, mustache)
+      // It will replace all placeholders inside the strings of the content with their evaluated value
+      this.instance.content = this.recursiveEngines()[this.instance.content.engine || 'default'].call(this, this.instance.content, this);
 
       cb();
     }.bind(this));
@@ -146,7 +150,7 @@ TemplateGenerator.prototype.postPrompts = function (opts) {
 // ----------------------------------------------------------------------------
 
 TemplateGenerator.prototype.writeFiles = function (opts) {
-  if (this.instance.path && this.instance.stats.isDirectory()) {
+  if (this.instance.content && this.instance.stats.isDirectory()) {
     this.writeDir(this.instance.path.localPath);
   }
 };

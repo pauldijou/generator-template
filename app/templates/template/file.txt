@@ -1,0 +1,3 @@
+// A sample file with a really really tiny templating
+
+Hi <%= prompts.name %>. Thanks for using generator-template!

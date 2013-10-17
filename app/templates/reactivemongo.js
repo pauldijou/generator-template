@@ -1,4 +1,3 @@
-var helpers = require("../../utils/inquire-helpers.js");
 var _ = require("lodash");
 
 var defaultVersions = []
@@ -13,7 +12,7 @@ module.exports = {
     "type": "input",
     "name": "dbname",
     "message": "DB name?",
-    "validate": helpers.required()
+    "validate": this.helpers.inquirer.required()
   },{
     "type": "input",
     "name": "host",
@@ -24,17 +23,17 @@ module.exports = {
     "name": "port",
     "message": "Port?",
     "default": "27017",
-    "filter": helpers.toInt()
+    "filter": this.helpers.inquirer.toInt()
   },{
     "type": "input",
     "name": "username",
     "message": "[optional] Username?",
-    "filter": helpers.toUndefined()
+    "filter": this.helpers.inquirer.toUndefined()
   },{
     "type": "password",
     "name": "password",
     "message": "[optional] Password?",
-    "filter": helpers.toUndefined(),
+    "filter": this.helpers.inquirer.toUndefined(),
     "when": function (answers) {
       return !!answers.username;
     }
@@ -42,7 +41,7 @@ module.exports = {
   "app": {
     "conf": {
       "application": [
-        'mongodb.uri="mongodb://<%= prompts.username %><% if(prompts.username && prompts.password) { %>:<%= prompts.password %><% } %><% if(prompts.username) { %>@<% } %><%= prompts.host %>:<%= prompts.port %>/<%= prompts.dbname %>"'
+        'mongodb.uri="mongodb://<%= instance.prompts.username %><% if(instance.prompts.username && instance.prompts.password) { %>:<%= instance.prompts.password %><% } %><% if(instance.prompts.username) { %>@<% } %><%= instance.prompts.host %>:<%= instance.prompts.port %>/<%= instance.prompts.dbname %>"'
         ],
       "plugins": []
     },

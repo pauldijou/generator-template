@@ -7,6 +7,8 @@ var q = require('q');
 var chalk = require('chalk');
 var request = require('request');
 var yeoman = require('yeoman-generator');
+var minimatch = require('minimatch');
+var helpers = require('../utils/helpers.js');
 
 var TemplateBase = module.exports =  function TemplateBase(args, options) {
   this.logLevel = options['log-level'] || (options.verbose && 'debug') || 'info';
@@ -33,11 +35,17 @@ var TemplateBase = module.exports =  function TemplateBase(args, options) {
     this.log.error(chalk.red('Error: ') + msg);
   });
 
+  this.on("end", function () {
+    this.writeConfig();
+  });
+
   _.str = require('underscore.string');
   _.mixin(_.str.exports());
 
   this._ = _;
   this.chalk = chalk;
+  this.minimatch = minimatch;
+  this.helpers = helpers;
 };
 
 // Generic methods
@@ -138,7 +146,7 @@ yeoman.generators.Base.prototype.recursiveApply = function (obj, fn, clone) {
     } else {
       obj[key] = fn(value);
     }
-  }.bind(this));
+  }, this);
 
   return obj;
 };
@@ -167,9 +175,9 @@ yeoman.generators.Base.prototype.recursiveMustacheEngine = function (obj, data) 
 
 yeoman.generators.Base.prototype.underscoreEngine = function (text, data) {
   return this._.template(text, data, {
-    escape: /this._-([\s\S]+?)this._/g,
-    evaluate: /this._([\s\S]+?)this._/g,
-    interpolate: /this._=([\s\S]+?)this._/g
+    escape: /_-([\s\S]+?)_/g,
+    evaluate: /_([\s\S]+?)_/g,
+    interpolate: /_=([\s\S]+?)_/g
   });
 };
 
@@ -291,16 +299,26 @@ TemplateBase.prototype.writeDir = function (currentPath) {
       return path.join(currentPath, file);
     })
     .reject(function (filePath) {
-      var relativeFilePath = filePath.substr(this.instance.path.length + 1);
-      return this.instance.config.files
-        && this.instance.config.files[relativeFilePath]
-        && this.instance.config.files[relativeFilePath].excluded
-        && eval(this.instance.config.files[relativeFilePath].excluded);
-    }.bind(this))
+      var relativeFilePath = filePath.substr(this.instance.path.localPath.length + 1);
+      var excluded = false;
+
+      if (this.instance.content && this.instance.content.files) {
+        this._.forEach(this.instance.content.files, function (value, pattern) {
+          // Only try to match if the pattern can exclude and the file isn't excluded yet
+          // and if the pattern match the relative path (meaning the path relative to the localPath of the instance)
+          if (!excluded && value.excluded && this.minimatch(relativeFilePath, pattern)) {
+            excluded = eval(value.excluded)
+          }
+          
+        }, this);
+      }
+      
+      return excluded;
+    }, this)
     .forEach(function (filePath) {
       var stat = fs.statSync(filePath);
       stat.isDirectory() ? this.writeDir(filePath) : this.writeFile(filePath);
-    }.bind(this)); 
+    }, this); 
 };
 
 TemplateBase.prototype.writeFile = function (filePath) {
@@ -317,9 +335,9 @@ TemplateBase.prototype.mergeJson = function (source1, source2) {
 };
 
 TemplateBase.prototype.updateJson = function (path, property) {
-  if (this.instance.config[property] && this.existsFile(path)) {
+  if (this.instance.content[property] && this.existsFile(path)) {
     var data = this.readFileAsJson(path);
-    data = this.this._merge(data, this.instance.config[property]);
+    data = this.this._merge(data, this.instance.content[property]);
     this.writeFileFromJson(path, data);
   }
 };
@@ -333,12 +351,8 @@ TemplateBase.prototype.isLocalPath = function (path) {
   return this._.str.startsWith(path, "/");
 }
 
-// ----------------------------------------------------------------------------
-// Private util functions
-// ----------------------------------------------------------------------------
-
 // Check if a path exists, locally or remotely
-TemplateBase.prototype._checkPath = function (rootPath) {
+TemplateBase.prototype.checkPath = function (rootPath) {
   var deferred = q.defer();
 
   if (this.isLocalPath(rootPath)) {
@@ -374,7 +388,7 @@ TemplateBase.prototype._checkPath = function (rootPath) {
 // - promise has been rejected
 // - no value
 // - remote path with a status code !== 200
-TemplateBase.prototype._filterPaths = function (paths) {
+TemplateBase.prototype.filterPaths = function (paths) {
   this._log('info', '');
   this._log('info', 'Filtering paths...');
 
@@ -403,7 +417,7 @@ TemplateBase.prototype._filterPaths = function (paths) {
 // If multiple possible paths, ask user which one he wants to use,
 // if only one, use it,
 // if none, crash (and do it the hard way!)
-TemplateBase.prototype._chooseInstancePath = function (paths) {
+TemplateBase.prototype.chooseInstancePath = function (paths) {
   var deferred = q.defer();
 
   if (paths.length > 1) {
@@ -441,7 +455,7 @@ TemplateBase.prototype._chooseInstancePath = function (paths) {
 // Formats:
 // - GitHub repo: ok
 // - tar file: TODO
-TemplateBase.prototype._downloadIfRemote = function (path) {
+TemplateBase.prototype.downloadIfRemote = function (path) {
   var deferred = q.defer();
   if (path && !path.localPath) {
     this._log('info', '');
