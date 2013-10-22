@@ -1,6 +1,6 @@
 {
   "name": "generator-template",
-  "version": "0.0.1-SNAPSHOT-3",
+  "version": "0.0.1",
   "description": "A Yeoman generator for bootstraping projects from templates",
   "keywords": [
     "yeoman-generator",
