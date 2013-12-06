@@ -1,7 +1,6 @@
 'use strict';
 var util = require('util');
 var yeoman = require('yeoman-generator');
-var chalk = require('chalk');
 var TemplateBase = require('../utils/template-base');
 
 var ConfigGenerator = module.exports = function ConfigGenerator(args, options, config) {

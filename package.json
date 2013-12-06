@@ -24,9 +24,9 @@
     "test": "mocha"
   },
   "dependencies": {
-    "yeoman-generator": "~0.13.0",
-    "chalk": "~0.2.0",
-    "lodash": "~2.2.0",
+    "yeoman-generator": "~0.14.0",
+    "chalk": "~0.3.0",
+    "lodash": "~2.4.0",
     "underscore.string": "~2.3.0",
     "q": "0.9.7",
     "request": "~2.27.0",

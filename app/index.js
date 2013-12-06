@@ -1,7 +1,7 @@
 'use strict';
-var util = require('util');
-var fs = require('fs');
-var q = require('q');
+var Util = require('util');
+var FS = require('fs');
+var Q = require('q');
 var TemplateBase = require('../utils/template-base');
 
 // ----------------------------------------------------------------------------
@@ -12,7 +12,8 @@ var TemplateGenerator = module.exports = function TemplateGenerator(args, option
   TemplateBase.apply(this, arguments);
 
   this.argument('templateName', {
-    'required': false, // truth to be told, it is required, but since I don't like the default message, I will do it my own way
+    // truth to be told, it is required, but since I don't like the default message, I will do it my own way
+    'required': false,
     'optional': true,
     'type': String,
     'desc': 'The name of your template. Must match a node module inside at least one of your configured paths.'
@@ -31,7 +32,7 @@ var TemplateGenerator = module.exports = function TemplateGenerator(args, option
 
 TemplateGenerator.Base = TemplateBase;
 
-util.inherits(TemplateGenerator, TemplateBase);
+Util.inherits(TemplateGenerator, TemplateBase);
 
 // ----------------------------------------------------------------------------
 // Load the instance configuration
@@ -63,7 +64,7 @@ TemplateGenerator.prototype.loadInstance = function (opts) {
   var downloadIfRemote = this._.bind(this.downloadIfRemote, this);
 
   // When all checks completed...
-  q.allSettled(this.instance.paths)
+  Q.allSettled(this.instance.paths)
     .then(filterPaths)
     .then(chooseInstancePath)
     .then(downloadIfRemote)
@@ -75,7 +76,7 @@ TemplateGenerator.prototype.loadInstance = function (opts) {
       self.instance.path = path;
 
       try {
-        self.instance.stats = fs.statSync( self.instance.path.localPath );
+        self.instance.stats = FS.statSync( self.instance.path.localPath );
 
         // Load the instance of the template which should be a valid Node module
         self.instance.content = require( self.instance.path.localPath );
@@ -100,11 +101,7 @@ TemplateGenerator.prototype.loadInstance = function (opts) {
 // ----------------------------------------------------------------------------
 
 TemplateGenerator.prototype.welcome = function (opts) {
-  if (this.instance.content && this.instance.content.welcome) {
-    this._.forEach(this.instance.content.welcome, function (w) {
-      this._log(w.status, w.message);
-    }, this)
-  }
+  this.callIfDefined.call(this, 'welcome');
 };
 
 // ----------------------------------------------------------------------------
@@ -112,9 +109,7 @@ TemplateGenerator.prototype.welcome = function (opts) {
 // ----------------------------------------------------------------------------
 
 TemplateGenerator.prototype.prePrompts = function (opts) {
-  if (this.instance.content && this.instance.content.prePrompts) {
-    this.instance.content.prePrompts.call(this);
-  }
+  this.callIfDefined.call(this, 'prePrompts');
 };
 
 TemplateGenerator.prototype.doPrompts = function (opts) {
@@ -140,9 +135,7 @@ TemplateGenerator.prototype.doPrompts = function (opts) {
 };
 
 TemplateGenerator.prototype.postPrompts = function (opts) {
-  if (this.instance.content && this.instance.content.postPrompts) {
-    this.instance.content.postPrompts.call(this);
-  }
+  this.callIfDefined.call(this, 'postPrompts');
 };
 
 // ----------------------------------------------------------------------------
@@ -156,74 +149,29 @@ TemplateGenerator.prototype.writeFiles = function (opts) {
 };
 
 TemplateGenerator.prototype.postWriteFiles = function (opts) {
-  if (this.instance.content && this.instance.content.postWriteFiles) {
-    this.instance.content.postWriteFiles.call(this);
-  }
+  this.callIfDefined.call(this, 'postWriteFiles');
 };
 
 // ----------------------------------------------------------------------------
 // Update project configuration files
 // ----------------------------------------------------------------------------
 
-TemplateGenerator.prototype.writeConfFiles = function (opts) {
+TemplateGenerator.prototype.updateConfFiles = function (opts) {
   if (this.instance.content) {
-    var packagePath = this.paths.root + '/package.json';
-    var bowerPath = this.paths.root + '/bower.json';
-    var gruntPath = this.paths.root + '/Gruntfile.js';
-
-    this.updateJson(packagePath, 'package');
-    this.updateJson(bowerPath, 'bower');
-
-    if (this.instance.content.grunt && this.existsFile(gruntPath)) {
-      var gruntfile = this.readFileAsString(gruntPath);
-
-      var startToken = 'initConfig(';
-      var endToken = ');';
-      var startConfig = gruntfile.indexOf(startToken) + startToken.length;
-      var endConfig = gruntfile.indexOf(endToken, startConfig);
-
-      var gruntConfig = gruntfile.substring(startConfig, endConfig);
-
-      // Preserve all JavaScript variables inside the Gruntfile
-      var variables = ['configuration'];
-      var variablesMapping = {};
-      this._.forEach(variables, function (variable) {
-        var stringVariable = '@{' + variable + '}';
-        variablesMapping[variable] = stringVariable;
-        gruntConfig = gruntConfig.replace(variable, 'variablesMapping.' + variable);
-      });
-
-      var gruntConfigObject;
-      eval('gruntConfigObject = ' + gruntConfig);
-      gruntConfigObject = this.mergeJson(gruntConfigObject, this.instance.content.grunt);
-
-      gruntConfig = JSON.stringify(gruntConfigObject, null, '  ');
-
-      this._.forEach(variablesMapping, function (stringVariable, variable) {
-        gruntConfig = gruntConfig.replace('\\' + stringVariable + '\\', variable);
-      });
-
-      gruntfile = gruntfile.substring(0, startConfig) + gruntConfig + gruntfile.substring(endConfig);
-
-      this.writeFileFromString(gruntfile, 'Gruntfile.js');
-    }
+    this._.forEach(this.instance.content.configuration, function (configFile) {
+      this.updateConfigFile(configFile);
+    });
   }
 };
 
-TemplateGenerator.prototype.postWriteConfFiles = function (opts) {
-  if (this.instance.content && this.instance.content.postWriteConfFiles) {
-    this.instance.content.postWriteConfFiles.call(this);
-  }
-}
+TemplateGenerator.prototype.postUpdateConfFiles = function (opts) {
+  this.callIfDefined.call(this, 'postUpdateConfFiles');
+};
 
 // ----------------------------------------------------------------------------
 // Say goodbye and hope he will use you again...
 // ----------------------------------------------------------------------------
 
 TemplateGenerator.prototype.bye = function (opts) {
-  if (this.instance.content && this.instance.content.bye) {
-    this._.forEach(this.instance.content.bye, function (w) {
-      this._log(w.status, w.message);
-    }.bind(this))
-  }
+  this.callIfDefined.call(this, 'bye');
 };

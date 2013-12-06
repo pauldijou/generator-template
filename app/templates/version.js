@@ -13,4 +13,4 @@ module.exports = {
   'package': {
     'version': '<%= instance.prompts.version %>'
   }
-}
+};
