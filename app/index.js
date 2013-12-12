@@ -35,54 +35,51 @@ TemplateGenerator.Base = TemplateBase;
 Util.inherits(TemplateGenerator, TemplateBase);
 
 // ----------------------------------------------------------------------------
-// Load the instance configuration
+// Load template
 // ----------------------------------------------------------------------------
 
-TemplateGenerator.prototype.loadInstance = function (opts) {
-  this.instance = {};
-  this.instance.config = this.config;
-  this.instance.name = this.templateName || (opts && opts.defaultTemplateName);
-  this.instance.options = this.options;
+TemplateGenerator.prototype.loadTemplate = function (opts) {
+  this.templateName = this.templateName || (opts && opts.defaultTemplateName);
 
-  if (!this.instance.name) {
+  if (!this.templateName) {
     return this.emit('error', 'You must specify a template name!');
   }
 
-  // If path specified, only check self one,
+  // If path specified, only check this one,
   // otherwise, check all configured path + source root of generator
-  this.instance.rootPaths = (this.options.path && [this.options.path]) || this.getTemplatePaths();
+  this.rootPaths = (this.options.path && [this.options.path]) || this.getTemplatePaths();
 
   // Asynchrounsly check which paths exist
   this._log('info', 'Looking for your template at the following paths:');
-  this.instance.paths = this._.map(this.instance.rootPaths, this.checkPath, this);
+  this.containerPaths = this._.map(this.rootPaths, this.checkPath, this);
   
   var cb = this.async();
   var self = this;
 
   var filterPaths = this._.bind(this.filterPaths, this);
-  var chooseInstancePath = this._.bind(this.chooseInstancePath, this);
+  var chooseTemplatePath = this._.bind(this.chooseTemplatePath, this);
   var downloadIfRemote = this._.bind(this.downloadIfRemote, this);
 
   // When all checks completed...
-  Q.allSettled(this.instance.paths)
+  Q.allSettled(this.containerPaths)
     .then(filterPaths)
-    .then(chooseInstancePath)
+    .then(chooseTemplatePath)
     .then(downloadIfRemote)
     .done(function (path) {
       if (!path || !path.localPath) {
         return self.emit('error', 'Invalid path: ' + JSON.stringify(path));
       }
 
-      self.instance.path = path;
+      self.templatePath = path;
 
       try {
-        self.instance.stats = FS.statSync( self.instance.path.localPath );
+        self.stats = FS.statSync( self.templatePath.localPath );
 
-        // Load the instance of the template which should be a valid Node module
-        self.instance.content = require( self.instance.path.localPath );
+        // Load the content of the template which should be a valid Node module
+        self.content = require( self.templatePath.localPath );
 
-        if (!self.instance.content) {
-          return self.emit('error', 'No module file found for name "' + self.instance.name + '" at path "' + self.instance.path.localPath + '"');
+        if (!self.content) {
+          return self.emit('error', 'No module file found for name "' + self.templateName + '" at path "' + self.templatePath.localPath + '"');
         }
       }
       catch (e) {
@@ -113,21 +110,21 @@ TemplateGenerator.prototype.prePrompts = function (opts) {
 };
 
 TemplateGenerator.prototype.doPrompts = function (opts) {
-  if (this.instance.content && this.instance.content.prompts) {
+  if (this.content && this.content.prompts) {
     var cb = this.async();
 
-    this.instance.prompts = {};
+    this.prompts = {};
 
-    this.prompt(this.instance.content.prompts, function (props, err) {
+    this.prompt(this.content.prompts, function (props, err) {
       if (err) {
         return this.emit('error', err);
       }
 
-      this.instance.prompts = props;
+      this.prompts = props;
 
-      // Template the content of the instance using the engine of your choice (default, underscore, mustache)
+      // Template the content of the template using the engine of your choice (default, underscore, mustache)
       // It will replace all placeholders inside the strings of the content with their evaluated value
-      this.instance.content = this.recursiveEngines()[this.instance.content.engine || 'default'].call(this, this.instance.content, this);
+      this.content = this.recursiveEngines()[this.content.engine || 'default'].call(this, this.content, this);
 
       cb();
     }.bind(this));
@@ -143,8 +140,8 @@ TemplateGenerator.prototype.postPrompts = function (opts) {
 // ----------------------------------------------------------------------------
 
 TemplateGenerator.prototype.writeFiles = function (opts) {
-  if (this.instance.content && this.instance.stats.isDirectory()) {
-    this.writeDir(this.instance.path.localPath);
+  if (this.content && this.stats.isDirectory()) {
+    this.writeDir(this.templatePath.localPath);
   }
 };
 
@@ -157,10 +154,10 @@ TemplateGenerator.prototype.postWriteFiles = function (opts) {
 // ----------------------------------------------------------------------------
 
 TemplateGenerator.prototype.updateConfFiles = function (opts) {
-  if (this.instance.content) {
-    this._.forEach(this.instance.content.configuration, function (configFile) {
+  if (this.content) {
+    this._.forEach(this.content.configuration, function (configFile) {
       this.updateConfigFile(configFile);
-    });
+    }, this);
   }
 };
 

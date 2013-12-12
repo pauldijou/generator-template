@@ -1,0 +1,4 @@
+{
+<% if (prompts.name) { %>  "name": "<%= prompts.name %>",<% } %>
+  "version": "0.0.1-SNAPSHOT"
+}

@@ -3,12 +3,14 @@ var util = require('util');
 var path = require('path');
 var fs = require('fs');
 var _ = require('lodash');
+var _Str = require('underscore.string');
 var q = require('q');
 var chalk = require('chalk');
 var request = require('request');
 var yeoman = require('yeoman-generator');
 var minimatch = require('minimatch');
 var helpers = require('../utils/helpers.js');
+
 
 var TemplateBase = module.exports =  function TemplateBase(args, options) {
   this.logLevel = options['log-level'] || (options.verbose && 'debug') || 'info';
@@ -34,7 +36,9 @@ var TemplateBase = module.exports =  function TemplateBase(args, options) {
 
   // Generic display of errors
   this.on('error', function (msg) {
+    this._emptyLine();
     this.log.error(chalk.red('Error: ') + msg);
+    this._emptyLine();
   });
 
   // Never forget to save the config on disk
@@ -43,15 +47,20 @@ var TemplateBase = module.exports =  function TemplateBase(args, options) {
   });
 
   // Let's extend Lo-Dash with awesome functions on String
-  _.str = require('underscore.string');
+  _.str = _Str;
   _.mixin(_.str.exports());
 
   // Assign some utils to this so we can use them everywhere
   this._ = _;
+  this.util = util;
+  this.path = path;
+  this.fs = fs;
+  this.request = request;
   this.chalk = chalk;
   this.minimatch = minimatch;
   this.helpers = helpers;
 };
+
 
 // ###############################################################################################
 // ###############################################################################################
@@ -61,7 +70,6 @@ var TemplateBase = module.exports =  function TemplateBase(args, options) {
 // ###############################################################################################
 // ###############################################################################################
 
-
 /**
   * Test if a value is not null and not undefined
   * @param {*} value - The value to test.
@@ -69,11 +77,6 @@ var TemplateBase = module.exports =  function TemplateBase(args, options) {
   */
 yeoman.generators.Base.prototype.isDefined = function (value) {
   return !this._.isNull(value) && !this._.isUndefined(value);
-};
-
-// @deprecated: use isDefined
-yeoman.generators.Base.prototype.exists = function (value) {
-	return !this._.isNull(value) && !this._.isUndefined(value);
 };
 
 /**
@@ -136,9 +139,11 @@ yeoman.generators.Base.prototype.recursiveApply = function (obj, fn, clone) {
 
   this._.forEach(obj, function (value, key) {
     if (this._.isArray(value)) {
-      obj[key] = this._.map(value, fn);
+      obj[key] = this._.map(value, function (v) {
+        return this.recursiveApply.call(this, v, fn, clone);
+      }, this);
     } else if(this._.isObject(value)) {
-      this.recursiveApply(value, fn, clone);
+      this.recursiveApply.call(this, value, fn, clone);
     } else {
       obj[key] = fn(value);
     }
@@ -305,18 +310,38 @@ TemplateBase.prototype._emptyLine = function () {
   this._log('write', '');
 };
 
+TemplateBase.prototype._info = function (message) {
+  this._log('writeln', this.chalk.gray(message));
+};
+
+TemplateBase.prototype._high = function (message) {
+  this._log('writeln', this.chalk.cyan(message));
+};
+
+TemplateBase.prototype._success = function (message) {
+  this._log('writeln', this.chalk.green(message));
+};
+
+TemplateBase.prototype._warn = function (message) {
+  this._log('writeln', this.chalk.yellow(message));
+};
+
+TemplateBase.prototype._error = function (message) {
+  this._log('writeln', this.chalk.red(message));
+};
+
 TemplateBase.prototype.mergeJson = function (source1, source2) {
   return this._.merge(source1, source2, function (a, b) {
     return this._.isArray(a) ? this._.uniq(a.concat(b), function (value) {
       return this._.isObject(value) || this._.isArray(value) ? JSON.stringify(value) : value;
     }) : undefined;
-  });
+  }, this);
 };
 
 TemplateBase.prototype.updateJson = function (path, content) {
   if (content && this.existsFile(path)) {
     var data = this.readFileAsJson(path);
-    data = this.this._merge(data, content);
+    data = this.mergeJson(data, content);
     this.writeFileFromJson(path, data);
   }
 };
@@ -325,7 +350,7 @@ TemplateBase.prototype.updateJson = function (path, content) {
 // ###############################################################################################
 // ###############################################################################################
 //
-// LOAD TEMPLATE INSTANCE
+// LOAD TEMPLATE
 //
 // ###############################################################################################
 // ###############################################################################################
@@ -344,15 +369,15 @@ TemplateBase.prototype.checkPath = function (rootPath) {
   var deferred = q.defer();
 
   if (this.isLocalPath(rootPath)) {
-    var instancePath = path.join(rootPath, this.instance.name);
-    this._log('info', '  ' + chalk.green('local') + '  ' + instancePath);
-    if (this.existsFile(instancePath)) {
-      deferred.resolve(instancePath);
+    var templatePath = path.join(rootPath, this.templateName);
+    this._log('info', '  ' + chalk.green('local') + '  ' + templatePath);
+    if (this.existsFile(templatePath)) {
+      deferred.resolve(templatePath);
     } else {
       deferred.resolve(undefined);
     }
   } else {
-    var url = rootPath + (this._.str.endsWith(rootPath, '/') ? '' : '/') + this.instance.name;
+    var url = rootPath + (this._.str.endsWith(rootPath, '/') ? '' : '/') + this.templateName;
     this._log('info', '  ' + chalk.red('remote') + ' ' + url);
     request({
       url: url,
@@ -405,7 +430,7 @@ TemplateBase.prototype.filterPaths = function (paths) {
 // If multiple possible paths, ask user which one he wants to use,
 // if only one, use it,
 // if none, crash (and do it the hard way!)
-TemplateBase.prototype.chooseInstancePath = function (paths) {
+TemplateBase.prototype.chooseTemplatePath = function (paths) {
   var deferred = q.defer();
 
   if (paths.length > 1) {
@@ -433,7 +458,7 @@ TemplateBase.prototype.chooseInstancePath = function (paths) {
     deferred.resolve(paths[0]);
   }
   else {
-    deferred.reject('No template found for name "' + this.instance.name + '" at paths [' + this.instance.rootPaths.join(', ') + ']');
+    deferred.reject('No template found for name "' + this.templateName + '" at paths [' + this.rootPaths.join(', ') + ']');
   }
 
   return deferred.promise;
@@ -458,7 +483,7 @@ TemplateBase.prototype.downloadIfRemote = function (path) {
       var github = {
         repo: data[0],
         user: data[1],
-        branch: this.instance.options.branch || 'master'
+        branch: this.options.branch || 'master'
       };
 
       this.remote(github.repo, github.user, github.branch, function(err, remote) {
@@ -478,8 +503,8 @@ TemplateBase.prototype.downloadIfRemote = function (path) {
 };
 
 TemplateBase.prototype.callIfDefined = function (property) {
-  if (this.instance.content && this.instance.content[property]) {
-    this.instance.content[property].call(this);
+  if (this.content && this.content[property]) {
+    this.content[property].call(this);
   }
 };
 
@@ -499,13 +524,13 @@ TemplateBase.prototype.writeDir = function (currentPath) {
       return path.join(currentPath, file);
     })
     .reject(function (filePath) {
-      var relativeFilePath = filePath.substr(this.instance.path.localPath.length + 1);
+      var relativeFilePath = filePath.substr(this.templatePath.localPath.length + 1);
       var excluded = false;
 
-      if (this.instance.content && this.instance.content.files) {
-        this._.forEach(this.instance.content.files, function (value, pattern) {
+      if (this.content && this.content.files) {
+        this._.forEach(this.content.files, function (value, pattern) {
           // Only try to match if the pattern can exclude and the file isn't excluded yet
-          // and if the pattern match the relative path (meaning the path relative to the localPath of the instance)
+          // and if the pattern match the relative path (meaning the path relative to the localPath of the template)
           if (!excluded && value.excluded && this.minimatch(relativeFilePath, pattern)) {
             excluded = eval(value.excluded);
           }
@@ -522,8 +547,8 @@ TemplateBase.prototype.writeDir = function (currentPath) {
 };
 
 TemplateBase.prototype.writeFile = function (filePath) {
-  var destinationPath = this.underscoreEngine(filePath, this.instance).replace(this.instance.path.localPath, this.paths.root);
-  this.template(filePath, destinationPath, this.instance);
+  var destinationPath = this.underscoreEngine(filePath, this).replace(this.templatePath.localPath, this.paths.root);
+  this.template(filePath, destinationPath, this);
 };
 
 
@@ -532,41 +557,28 @@ TemplateBase.prototype.writeFile = function (filePath) {
 //
 // UPDATE CONFIGURATION FILES
 //
-// ###############################################################################################
-// ###############################################################################################
-
 // Structure of a config file
 // type: [String= json | properties | grunt]
 // path: String: the path
 // content
+//
+// ###############################################################################################
+// ###############################################################################################
 
-TemplateBase.prototype.updateConfigFile = function (configFile) {
-  configFile.localPath = this.paths.root + configFile.path;
-
-  // Config can only update an existing file
-  if (!this.existsFile(configFile.localPath)) {
-    return;
-  }
-
-  switch (configFile.type.toLowerCase()) {
-    case 'json': this.updateJsonConfigFile(configFile); break;
-    case 'properties': this.updatePropertiesConfigFile(configFile); break;
-    case 'grunt': this.updateGruntConfigFile(configFile); break;
-    case 'gruntfile': this.updateGruntConfigFile(configFile); break;
-    default: break;
-  }
-};
-
-TemplateBase.prototype.updateJsonConfigFile = function (configFile) {
+function updateJsonConfigFile(configFile) {
   this.updateJson(configFile.localPath, configFile.content);
-};
+}
 
-TemplateBase.prototype.updatePropertiesConfigFile = function (configFile) {
+TemplateBase.prototype.updateJsonConfigFile = updateJsonConfigFile;
+
+function updatePropertiesConfigFile(configFile) {
   // TODO
-};
+}
+
+TemplateBase.prototype.updatePropertiesConfigFile = updatePropertiesConfigFile;
 
 // EXPERIMENTAL
-TemplateBase.prototype.updateGruntConfigFile = function (configFile) {
+function updateGruntConfigFile(configFile) {
   var gruntfile = this.readFileAsString(configFile.localPath);
 
   var startToken = 'initConfig(';
@@ -587,7 +599,7 @@ TemplateBase.prototype.updateGruntConfigFile = function (configFile) {
 
   var gruntConfigObject;
   eval('gruntConfigObject = ' + gruntConfig);
-  gruntConfigObject = this.mergeJson(gruntConfigObject, this.instance.content.grunt);
+  gruntConfigObject = this.mergeJson(gruntConfigObject, this.content.grunt);
 
   gruntConfig = JSON.stringify(gruntConfigObject, null, '  ');
 
@@ -598,6 +610,32 @@ TemplateBase.prototype.updateGruntConfigFile = function (configFile) {
   gruntfile = gruntfile.substring(0, startConfig) + gruntConfig + gruntfile.substring(endConfig);
 
   this.writeFileFromString(gruntfile, configFile.localPath);
+}
+
+TemplateBase.prototype.updateGruntConfigFile = updateGruntConfigFile;
+
+TemplateBase.prototype.configFiles = {
+  json: updateJsonConfigFile,
+  properties: updatePropertiesConfigFile,
+  grunt: updateGruntConfigFile,
+  gruntfile: updateGruntConfigFile
+};
+
+TemplateBase.prototype.updateConfigFile = function (configFile) {
+  configFile.localPath = this.path.join(this.paths.root, configFile.path);
+
+  // Config can only update an existing file
+  if (!this.existsFile(configFile.localPath)) {
+    return;
+  }
+
+  var sanitizedType = configFile.type.toLowerCase();
+
+  if (sanitizedType in this.configFiles) {
+    this.configFiles[sanitizedType].call(this, configFile);
+  } else {
+
+  }
 };
 
 
@@ -622,6 +660,7 @@ TemplateBase.prototype.configLoadCommands = function () {
       },
       // List all available paths with indicator about being local or remote
       list: function () {
+        this._emptyLine();
         this._log('ok', 'List of all path:');
         this._emptyLine();
 
@@ -633,6 +672,7 @@ TemplateBase.prototype.configLoadCommands = function () {
       },
       // Add a new path to the config
       add: function (path) {
+        this._emptyLine();
         this._log('ok', 'Add path: ' + path);
         this._emptyLine();
 
@@ -641,21 +681,23 @@ TemplateBase.prototype.configLoadCommands = function () {
       // Remove a path from the config
       // You can only remove added paths (default paths will always be available)
       remove: function (path) {
-        if (this._.find(this.config.paths, path)) {
+        if (this._.find(this.config.paths, function (p) {
+          return p === path;
+        })) {
+          this._emptyLine();
           this._log('ok', 'Remove path: ' + path);
           this._emptyLine();
 
           this.config.paths = this._.without(this.config.paths, path);
         } else {
           this.emit('error', 'Remove failed. Unknow path "' + path + '"');
-          this._emptyLine();
         }
       }
     }
   };
 };
 
-TemplateBase.prototype.configHandleCommand = function (level) {
+TemplateBase.prototype.configHandleCommand = function (level, parentCommand) {
   var commandFunction = this._.isFunction(this.currentCommand) && this.currentCommand || this.currentCommand._function;
 
   if (commandFunction) {
@@ -663,15 +705,16 @@ TemplateBase.prototype.configHandleCommand = function (level) {
   } else if (this.args.length > level) {
     var subcommand = this.args[level];
     subcommand = (this.currentCommand._aliases && this.currentCommand._aliases[subcommand]) || subcommand;
+    parentCommand = parentCommand + ' ' + subcommand;
 
     if (this.currentCommand[subcommand]) {
       this.currentCommand = this.currentCommand[subcommand];
-      return this.configHandleCommand.call(this, level + 1);
+      return this.configHandleCommand.call(this, level + 1, parentCommand);
     } else {
-      return this.emit('error', 'Unknow command. Possible values are: path.');
+      return this.emit('error', 'Unknow command "' + parentCommand + '".');
     }
   } else {
-    return this.emit('error', 'Unknow command.');
+    return this.emit('error', 'Unknow command "' + parentCommand + '".');
   }
 };
 

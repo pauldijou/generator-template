@@ -20,9 +20,9 @@ ConfigGenerator.prototype.doConfig = function () {
 
   if (this.command && this.commands[this.command]) {
     this.currentCommand = this.commands[this.command];
-    this.configHandleCommand.call(this, 1);
+    this.configHandleCommand.call(this, 1, this.command);
     this.writeConfig();
   } else {
-    return this.emit('error', 'Unknow command.aze.');
+    return this.emit('error', 'Unknow command "' + this.command + '".');
   }
-}
+};
