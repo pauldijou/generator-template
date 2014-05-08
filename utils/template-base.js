@@ -61,6 +61,15 @@ var TemplateBase = module.exports =  function TemplateBase(args, options) {
   this.helpers = helpers;
 };
 
+// ###############################################################################################
+// ###############################################################################################
+//
+// INHERIT AND EXTEND YEOMAN BASE GENERATOR
+//
+// ###############################################################################################
+// ###############################################################################################
+
+util.inherits(TemplateBase, yeoman.generators.Base);
 
 // ###############################################################################################
 // ###############################################################################################
@@ -75,7 +84,7 @@ var TemplateBase = module.exports =  function TemplateBase(args, options) {
   * @param {*} value - The value to test.
   * @returns {boolean}
   */
-yeoman.generators.Base.prototype.isDefined = function (value) {
+TemplateBase.prototype.isDefined = function (value) {
   return !this._.isNull(value) && !this._.isUndefined(value);
 };
 
@@ -84,7 +93,7 @@ yeoman.generators.Base.prototype.isDefined = function (value) {
   * @param {string} path - The path to test.
   * @returns {boolean}
   */
-yeoman.generators.Base.prototype.existsFile = function (path) {
+TemplateBase.prototype.existsFile = function (path) {
 	return fs.existsSync(path);
 };
 
@@ -96,7 +105,7 @@ yeoman.generators.Base.prototype.existsFile = function (path) {
   * if it fails to read the content as JSON.
   * @returns {*}
   */
-yeoman.generators.Base.prototype.readFileAsJson = function(path, defaultValue) {
+TemplateBase.prototype.readFileAsJson = function(path, defaultValue) {
 	return this.existsFile(path) && JSON.parse(this.readFileAsString(path)) || defaultValue;
 };
 
@@ -108,8 +117,8 @@ yeoman.generators.Base.prototype.readFileAsJson = function(path, defaultValue) {
   * @param {string} [space="  "] - The string to use for pretty format
   * @returns {*}
   */
-yeoman.generators.Base.prototype.writeFileFromJson = function(path, value, space) {
-  space = space || "  ";
+TemplateBase.prototype.writeFileFromJson = function(path, value, space) {
+  space = space || '  ';
   return this.writeFileFromString(JSON.stringify(value, null, space), path);
 };
 
@@ -119,7 +128,7 @@ yeoman.generators.Base.prototype.writeFileFromJson = function(path, value, space
   * @param {string} newLine - The string to append. Will be prepend with "\n"
   * @returns {boolean}
   */
-yeoman.generators.Base.prototype.appendLine = function (content, newLine) {
+TemplateBase.prototype.appendLine = function (content, newLine) {
   return content + '\n' + newLine;
 };
 
@@ -132,7 +141,7 @@ yeoman.generators.Base.prototype.appendLine = function (content, newLine) {
   * clone the collection so you can be a bit more immutable
   * @returns {object | array}
   */
-yeoman.generators.Base.prototype.recursiveApply = function (obj, fn, clone) {
+TemplateBase.prototype.recursiveApply = function (obj, fn, clone) {
   if (clone) {
     obj = this._.clone(obj);
   }
@@ -161,7 +170,7 @@ yeoman.generators.Base.prototype.recursiveApply = function (obj, fn, clone) {
 // ###############################################################################################
 // ###############################################################################################
 
-yeoman.generators.Base.prototype.mustacheEngine = function (text, data) {
+TemplateBase.prototype.mustacheEngine = function (text, data) {
   return this._.template(text, data, {
     escape: /{{-([\s\S]+?)}}/g,
     evaluate: /{{([\s\S]+?)}}/g,
@@ -169,7 +178,7 @@ yeoman.generators.Base.prototype.mustacheEngine = function (text, data) {
   });
 };
 
-yeoman.generators.Base.prototype.underscoreEngine = function (text, data) {
+TemplateBase.prototype.underscoreEngine = function (text, data) {
   return this._.template(text, data, {
     escape: /_-([\s\S]+?)_/g,
     evaluate: /_([\s\S]+?)_/g,
@@ -177,7 +186,7 @@ yeoman.generators.Base.prototype.underscoreEngine = function (text, data) {
   });
 };
 
-yeoman.generators.Base.prototype.engines = function () {
+TemplateBase.prototype.engines = function () {
   return {
     'default': this.engine,
     'underscore': this.underscoreEngine,
@@ -185,7 +194,7 @@ yeoman.generators.Base.prototype.engines = function () {
   };
 };
 
-yeoman.generators.Base.prototype.recursiveEngine = function (engine, obj, data) {
+TemplateBase.prototype.recursiveEngine = function (engine, obj, data) {
   return this.recursiveApply(obj, function (value) {
     if (this._.isString(value)) {
       return engine.call(this, value, data);
@@ -195,19 +204,19 @@ yeoman.generators.Base.prototype.recursiveEngine = function (engine, obj, data) 
   }.bind(this));
 };
 
-yeoman.generators.Base.prototype.recursiveMustacheEngine = function (obj, data) {
+TemplateBase.prototype.recursiveMustacheEngine = function (obj, data) {
   return this.recursiveEngine(this.mustacheEngine, obj, data);
 };
 
-yeoman.generators.Base.prototype.recursiveUnderscoreEngine = function (obj, data) {
+TemplateBase.prototype.recursiveUnderscoreEngine = function (obj, data) {
   return this.recursiveEngine(this.underscoreEngine, obj, data);
 };
 
-yeoman.generators.Base.prototype.recursiveDefaultEngine = function (obj, data) {
+TemplateBase.prototype.recursiveDefaultEngine = function (obj, data) {
   return this.recursiveEngine(this.engine, obj, data);
 };
 
-yeoman.generators.Base.prototype.recursiveEngines = function () {
+TemplateBase.prototype.recursiveEngines = function () {
   return {
     'default': this.recursiveDefaultEngine,
     'underscore': this.recursiveUnderscoreEngine,
@@ -223,8 +232,6 @@ yeoman.generators.Base.prototype.recursiveEngines = function () {
 //
 // ###############################################################################################
 // ###############################################################################################
-
-util.inherits(TemplateBase, yeoman.generators.Base);
 
 TemplateBase.prototype.print = function (msg, context) {
   if (this._.isString(msg)) {
@@ -250,41 +257,6 @@ TemplateBase.prototype.readConfig = function () {
 
 TemplateBase.prototype.writeConfig = function () {
   this.writeFileFromJson(this.getConfigPath(), this.config);
-};
-
-function getConfRegex(key) {
-  return new RegExp('^' + key + '=(.*)$', 'm');
-}
-
-TemplateBase.prototype.readConfAsString = function (env) {
-  env = env || 'application';
-  return this.readFileAsString(path.join(this.paths.conf, env + '.conf'));
-};
-
-TemplateBase.prototype.writeConfFromString = function (stringConf, env) {
-  env = env || 'application';
-  return this.writeFileFromString(stringConf, path.join(this.paths.conf, env + '.conf'));
-};
-
-TemplateBase.prototype.hasConf = function (key, env) {
-  return getConfRegex(key).test(this.readConfAsString(env));
-};
-
-TemplateBase.prototype.getAllConfs = function (subkey, env) {
-  // TODO: wrong, do not work, correct it when time
-  return getConfRegex('[^=]*' + subkey + '[^=]*').exec(this.readConfAsString(env));
-};
-
-TemplateBase.prototype.getConf = function (key, env) {
-  return getConfRegex(key).exec(this.readConfAsString(env))[1];
-};
-
-TemplateBase.prototype.setConf = function (key, value, env) {
-  if (this.hasConf(key, value)) {
-    this.writeConfFromString(this.readConfAsString(env).replace( getConfRegex(key), key + '=' + value ), env);
-  } else {
-    this.writeConfFromString(this.readConfAsString(env) + '\n' + key + '=' + value, env);
-  }
 };
 
 // Possible statuses:
@@ -360,8 +332,12 @@ TemplateBase.prototype.getTemplatePaths = function () {
   return (this.config.paths || []).concat(this.constants['DEFAULT_PATHS']);
 };
 
+TemplateBase.prototype.isRemotePath = function (path) {
+  return this._.str.includes(path, '//');
+};
+
 TemplateBase.prototype.isLocalPath = function (path) {
-  return this._.str.startsWith(path, "/");
+  return !this.isLocalPath(path);
 };
 
 // Check if a path exists, locally or remotely
@@ -570,6 +546,56 @@ function updateJsonConfigFile(configFile) {
 }
 
 TemplateBase.prototype.updateJsonConfigFile = updateJsonConfigFile;
+
+function flatten(obj) {
+  var result = {};
+
+  _.forEach(obj, function (value, key) {
+    if(_.isObject(value)) {
+      var flatObj = flatten(value);
+      _.forEach(flatObj, function (subValue, subKey) {
+        result[key + '.' + subKey] = subValue;
+      });
+    } else {
+      result[key] = value;
+    }
+  });
+
+  return result;
+}
+
+function getPropertyRegex(key) {
+  return new RegExp('^' + key + '=(.*)$', 'm');
+}
+
+TemplateBase.prototype.readConfAsString = function (localPath) {
+  return this.readFileAsString(localPath);
+};
+
+TemplateBase.prototype.writeConfFromString = function (stringConf, env) {
+  return this.writeFileFromString(stringConf, path.join(this.paths.conf, env ));
+};
+
+TemplateBase.prototype.hasProperty = function (key, path) {
+  return getPropertyRegex(key).test(this.readConfAsString(path));
+};
+
+TemplateBase.prototype.getAllConfs = function (subkey, env) {
+  // TODO: wrong, do not work, correct it when time
+  return getPropertyRegex('[^=] *' + subkey + '[^=]*').exec(this.readConfAsString(env));
+};
+
+TemplateBase.prototype.getProperty = function (key, env) {
+  return getPropertyRegex(key).exec(this.readConfAsString(env))[1];
+};
+
+TemplateBase.prototype.setConf = function (key, value, env) {
+  if (this.hasProperty(key, value)) {
+    this.writeConfFromString(this.readConfAsString(env).replace( getConfRegex(key), key + '=' + value ), env);
+  } else {
+    this.writeConfFromString(this.readConfAsString(env) + '\n' + key + '=' + value, env);
+  }
+};
 
 function updatePropertiesConfigFile(configFile) {
   // TODO

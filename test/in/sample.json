@@ -1,0 +1,10 @@
+{
+  "key1": "value1",
+  "key2": ["array1", 1, true],
+  "key3": 42,
+  "key4": false,
+  "key5": {
+    "key51": "value51",
+    "key52": 52
+  }
+}
